@@ -4,6 +4,15 @@ library(rgeos)
 library(raster)
 library(reldist)
 
+PlotSpatialPattern<-function(d)
+{
+  df <- data.frame(x = at.pts[,1], y = at.pts[,2],z = d)
+  ggplot(df, aes(x = x, y = y, col = z)) +
+    geom_point() +
+    scale_colour_gradient(low="green", high="red")
+}
+
+
 #### Create a simulated autocorrelated surface for a region ####
 
 ecoregion.grid<-readOGR("C:/Users/mikeha/Dropbox/Threat mapping/Regional/GlobalGrid50kmRoundl_Clip_Ecoregion.shp")
@@ -21,7 +30,7 @@ Dd <- as.matrix(dist(at.pts))
 ## DEGREE OF AUTOCORRELATION
 p = 0.05
 ##
-for(p in c(0.0001,0.05,0.3))
+for(p in c(1E-6,0.0001,0.05,0.3))
 {
   # weights matrix
   w <- exp(-p * Dd)
@@ -46,20 +55,18 @@ for(p in c(0.0001,0.05,0.3))
   afrotropic.grid@data[[paste0("ThreatPrevalenceP",p)]]<-z
 }
 
+
+PlotSpatialPattern(afrotropic.grid$`ThreatPrevalenceP1e-06`)
+
+
 #Save the simulated grid
-save(afrotropic.grid, file = "C:/Users/mikeha/Dropbox/Threat mapping/SimulatedThreatData/afrotropic.threat.grid.Rdata")
+save(afrotropic.grid, file = "C:/Users/mikeha/Dropbox/Threat mapping/SimulatedThreatData/Revised/afrotropic.threat.grid.Rdata")
 
 #### Restart from here if have already saved the simulated grid####
 load("C:/Users/mikeha/Dropbox/Threat mapping/SimulatedThreatData/afrotropic.threat.grid.Rdata")
 
 
-PlotSpatialPattern<-function(d)
-{
-  df <- data.frame(x = at.pts[,1], y = at.pts[,2],z = d)
-  ggplot(df, aes(x = x, y = y, col = z)) +
-    geom_point() +
-    scale_colour_gradient(low="green", high="red")
-}
+
 
 #Read in the shapefile for the afrotropics grid, containing the threat intensity layers
 at.pts<-coordinates(gCentroid(afrotropic.grid,byid = T))
@@ -67,7 +74,7 @@ at.pts<-at.pts/50E3
 
 
 load("C:/Users/mikeha/Dropbox/Threat mapping/Regional 2017_3/Afrotropic/mammal_intersection.a.sp.R")
-load("C:/Users/mikeha/Dropbox/Threat mapping/Regional/Rdata/Afrotropic/mammal_ranges.R")
+load("C:/Users/mikeha/Dropbox/Threat mapping/Regional 2017_3/Afrotropic/mammal_ranges.R")
 
 
 access<-raster("F:/Work/Spatial data/accessibility_to_cities_2015_v1.0/accessibility_to_cities_2015_v1.0_moll.tif")
@@ -83,9 +90,6 @@ access.at.pts<-extract(access, coordinates(gCentroid(afrotropic.grid,byid = T)))
 
 
 z.layers<-colnames(afrotropic.grid@data)[grep("ThreatPrevalence",colnames(afrotropic.grid@data))]
-if(length(grep("Threshold",z.layers))>0) z.layers<-z.layers[-grep("Threshold",z.layers)]
-#z.layers<-z.layers[-3]
-
 
 r.a<-r.mammal.a
 
@@ -101,8 +105,10 @@ for(t in z.layers)
   q.threat.intensity<-array(NA, dim = c(ncol(r.a),length(q.prob)))
   for(sp in 1:ncol(r.a))
   {
-    cell.i<-which(!is.na(r.a[,sp]))
+    cell.i<-which((r.a[,sp]))
+    
     #weighted.q.threat.intensity[sp]<-(log(access.pts[cell.i]) %*% z[cell.i])/sum(log(access.pts[cell.i]))
+    #Want low travel times to be weighted higher than high travel times
     weighted.q.threat.intensity[sp,]<-wtd.quantile(z[cell.i][access.at.pts[cell.i] > 0], q=q.prob, na.rm = T, weight=log(1/access.at.pts[cell.i][access.at.pts[cell.i]>0]))
     q.threat.intensity[sp,]<-quantile(z[cell.i],probs = q.prob,na.rm = T)
   }
@@ -114,7 +120,7 @@ for(t in z.layers)
 #Create 2 sets of threat codes for each threat prevalence pattern
 #threat.breaks<-list(c(0,0.5,1.0),c(0,0.6,1.0),c(0,0.7,1.0))
 draws<-10
-ThreatCodes<-data.frame(binomial=r.bird.ranges$binomial)
+ThreatCodes<-data.frame(binomial=r.mammal.ranges$binomial)
 for(t in z.layers)
 {
   #for(d in seq_len(draws))
@@ -135,7 +141,7 @@ for(t in z.layers)
   }
 }
 
-write.csv(ThreatCodes,file<-"C:/Users/mikeha/Dropbox/Threat mapping/SimulatedThreatData/AftrotropicsThreatCodesConsensus10draws_w_p0.55.csv",row.names = F)
+write.csv(ThreatCodes,file<-"C:/Users/mikeha/Dropbox/Threat mapping/SimulatedThreatData/Revised/AftrotropicsThreatCodesConsensus10draws_w_p0.05.csv",row.names = F)
 
 #afrotropic.grid@data = afrotropic.grid@data[,c(1,2,3,6,4)]
 
